@@ -5,19 +5,46 @@ A containerized Flask application deployed to Kubernetes using Helm and managed 
 ## Architecture
 
 ```mermaid
-flowchart TD
-    DEV["Developer Push"] --> CI["GitHub Actions"]
+flowchart TB
+    DEV["Developer"] -->|Push code| REPO["GitHub Repository"]
+    REPO --> CI["GitHub Actions"]
 
-    CI --> TEST["Python Unit Tests"]
-    CI --> BUILD["Docker Image Build"]
-    CI --> HELM["Helm Validation"]
-    CI --> TF["Terraform Validation"]
-    CI --> KIND["Temporary kind Cluster"]
+    CI --> VALIDATE
+    CI --> INTEGRATE
 
-    KIND --> IMAGE["Load Application Image"]
-    IMAGE --> DEPLOY["Helm Deployment"]
-    DEPLOY --> APP["Flask Application"]
-    APP --> CHECK["Health and Readiness Checks"]
+    subgraph VALIDATE["CI - Validation"]
+        direction LR
+        TEST["Python Unit Tests"]
+        DOCKER["Docker Image Build"]
+        HELM_CHECK["Helm Lint and Template Validation"]
+        TF_CHECK["Terraform Format and Validation"]
+    end
+
+    subgraph INTEGRATE["CI - Kubernetes Integration"]
+        direction TB
+        KIND_CI["Create Temporary kind Cluster"]
+        LOAD["Load Docker Image"]
+        DEPLOY_CI["Deploy with Helm"]
+        APP_CI["Flask Application"]
+        CHECK["Rollout, Health and Readiness Checks"]
+
+        KIND_CI --> LOAD
+        LOAD --> DEPLOY_CI
+        DEPLOY_CI --> APP_CI
+        APP_CI --> CHECK
+    end
+
+    subgraph LOCAL["Local Infrastructure Management"]
+        direction TB
+        TF["Terraform Configuration"]
+        RELEASE["Terraform-Managed Helm Release"]
+        KIND_LOCAL["Local kind Cluster"]
+        APP_LOCAL["Flask Application"]
+
+        TF --> RELEASE
+        RELEASE --> KIND_LOCAL
+        KIND_LOCAL --> APP_LOCAL
+    end
 ```
 
 ## Technology Stack
