@@ -72,10 +72,14 @@ iac-kubernetes-platform/
 │   └── .terraform.lock.hcl
 ├── tests/
 │   └── test_app.py
+├── evidence/
+│   ├── github-actions-success.png
+│   ├── kubernetes-deployment.png
+│   ├── application-health-checks.png
+│   └── terraform-helm-validation.png
 ├── .gitignore
 └── README.md
 ```
-
 ## Prerequisites
 
 Install the following tools:
