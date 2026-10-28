@@ -212,6 +212,17 @@ After confirming that the local cluster is no longer needed, delete it:
 kind delete cluster --name iac-platform
 ```
 
+## Evidence
+
+Screenshots demonstrating the project's successful deployment and validation are available in the [`evidence/`](evidence/) directory.
+
+| Evidence | Description |
+|---|---|
+| [GitHub Actions](evidence/github-actions-success.png) | Successful CI and Kubernetes integration jobs |
+| [Kubernetes Deployment](evidence/kubernetes-deployment.png) | Deployment rollout, pods, and service |
+| [Application Health Checks](evidence/application-health-checks.png) | Application response, health, and readiness endpoints |
+| [Terraform and Helm Validation](evidence/terraform-helm-validation.png) | Helm linting, Terraform validation, and no-change plan |
+
 ## Project Status
 
 The Flask application, Docker image, local Kubernetes deployment, Helm chart, and Terraform-managed Helm release have been verified locally. Unit tests, Helm validation, Terraform validation, and the hosted GitHub Actions workflow have passed.
