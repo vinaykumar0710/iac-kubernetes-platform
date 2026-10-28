@@ -1,0 +1,114 @@
+﻿name: CI - IaC Kubernetes Platform
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+  workflow_dispatch:
+
+jobs:
+  test-and-validate:
+    name: Test and validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install application dependencies
+        run: python -m pip install -r app/requirements.txt
+
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Build Docker image
+        run: docker build -t iac-platform-app:ci ./app
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Lint Helm chart
+        run: |
+          helm lint helm/platform-app
+          helm lint helm/platform-app -f helm/platform-app/values-dev.yaml
+          helm lint helm/platform-app -f helm/platform-app/values-prod.yaml
+
+      - name: Validate Helm templates
+        run: |
+          helm template platform-app helm/platform-app \
+            -f helm/platform-app/values-dev.yaml \
+            --set image.tag=ci
+          helm template platform-app helm/platform-app \
+            -f helm/platform-app/values-prod.yaml \
+            --set image.tag=ci
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.17.0"
+
+      - name: Check Terraform formatting
+        working-directory: terraform
+        run: terraform fmt -check -recursive
+
+      - name: Initialize Terraform
+        working-directory: terraform
+        run: terraform init -backend=false
+
+      - name: Validate Terraform
+        working-directory: terraform
+        run: terraform validate
+
+  kubernetes-integration:
+    name: Kubernetes deployment test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Kubernetes cluster
+        uses: helm/kind-action@v1.12.0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Build application image
+        run: docker build -t iac-platform-app:ci ./app
+
+      - name: Load image into kind
+        run: kind load docker-image iac-platform-app:ci
+
+      - name: Deploy application with Helm
+        run: |
+          helm upgrade --install platform-app helm/platform-app \
+            --namespace platform-dev \
+            --create-namespace \
+            -f helm/platform-app/values-dev.yaml \
+            --set image.tag=ci \
+            --wait \
+            --timeout 180s
+
+      - name: Verify Kubernetes rollout
+        run: kubectl rollout status deployment/platform-app -n platform-dev --timeout=180s
+
+      - name: Verify application endpoints
+        shell: bash
+        run: |
+          kubectl port-forward service/platform-app 8080:80 -n platform-dev > /tmp/port-forward.log 2>&1 &
+          for attempt in {1..15}; do
+            if curl --fail --silent http://127.0.0.1:8080/healthz; then
+              break
+            fi
+            sleep 2
+          done
+
+          curl --fail --silent http://127.0.0.1:8080/healthz
+          curl --fail --silent http://127.0.0.1:8080/readyz
+          curl --fail --silent http://127.0.0.1:8080/ | jq -e '.version == "ci"'
